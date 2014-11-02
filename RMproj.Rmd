@@ -1,0 +1,146 @@
+---
+title: "Regression Models Project"
+author: "V. Boodram"
+date: "October 22, 2014"
+geometry: margin=2cm
+output: pdf_document
+---
+### Exectuive Summary
+
+Based on the 1974 statistics for fuel consumption and 10 aspects of automobile design for 32 (1973-4) automobile models, provided by the magazine _Motor Trend_ (1974), it would like to be determined if automatic or manual transmissions are better for fuel economy, measured in miles per gallon, and what the quantitative difference in mpg between the two transmission types is. 
+
+The appropriate predictive model for determining fuel economy with a set of potential predictors from those provided in the ```mtcars``` data set was determined to be
+$$\text{mpg}=9.68-3.917\times \text{weight}+1.226\times \text{quarter-mile time}+2.936\times \text{transmission:manual}$$
+
+With this model, it was determined with 95% confidence, all other variables being equal, that cars with a manual transmission have a fuel economy of 0.04107 mpg to 5.83093 mpg higher than cars with an automatic transmission. 
+
+### Methodology
+
+The full model (i.e: with every variable) was first evaluated from the skeptical point of view that none of the slopes $\beta_i$ in the set of potential predictors was in fact a statistically significant predictor of the response variable, mpg; the alternative hypothesis was that at least one predictor is a significant predictor of the response variable 
+
+$H_0: \beta_i=0, \ \forall i$  
+$H_A: \exists i \ni \beta_i\neq 0$
+
+```{r}
+# full model
+summary(lm(mpg ~. , data = mtcars))$fstatistic
+```
+
+The small p-value indicates that the model as a whole is significant, so the null hypothesis is rejected. 
+
+Having found evidence that there is at least one statistically significant predictor of mpg, an initial model was fit to determine if the transmission type was among these. 
+
+```{r}
+mtcars$am<-as.factor(mtcars$am)
+levels(mtcars$am)<-c("automatic", "manual")
+summary(lm(formula = mpg~am, mtcars))$coef
+```
+
+The percentage in variability of fuel economy explained by transmission type, $R^2$ is 36%, and with a small p-value (0.00029), transmission type was determined to be a significant predictor of fuel economy. The above summary indicates that automatic transmission cars achieve 17.15 mpg, and that all else being held constant, manual cars achieve 7.24 more mpg. The initial model
+$$\text{mpg}=17.17+7.24\times\text{transmission: manual}$$
+reflects patterns in the box plots in Appendix [Figure 1], composed in the exporatory data analysis. 
+
+The plots suggest that higher fuel efficiency is achieved by cars with manual transmissions; however, it may be the case that some other features may have been influencing the fuel consumption. This possibility was evaluated in reference to the bivariate plots in the Appendix [Figure 2]. These plots show scatter plots between each pair of variables in the data set, as well as the correlation coefficients on the upper half of the matrix. It shows a moderate correlation (0.66) between transmission and fuel efficiency, and significantly stronger correlations between mpg and the number of cylinders, the engine displacement, and the weight of the car, suggesting interactions between the potential set of predictors that may affect the amount of variability in mpg explained by transmission type. The collinearities between transmission type and these other variables are moderately high, with the strongest being between transmission type and weight, and transmission type and rear-axle ratio, which means that some of the information in the latter variables is already being captured by the variable transmission. 
+
+The remaining variables were incorporated into the model through a _backwards elimination_ process with reference to the p-value. Beginning with the full model (which includes every variable), in each iteration the variable with the highest p-value was discarded, and the model was refit, until all the variables contained in the model were significant, and this was declared the parsimonious model. Two iterations are included below; the complete algorithm is included in the Appendix.
+
+```{r, message=FALSE}
+require(nnet); require(dplyr)
+# iteration 1
+fit<-lm(mpg~., data = mtcars)
+ind<-which.is.max(x = summary(fit)$coef[,4])
+c(rownames(summary(fit)$coef)[ind], summary(fit)$coef[ind, 4])
+```
+
+The p value of the eliminated variable, cyl, is non-significant, and so the variable cyl is discarded as a potential predictor
+
+```{r}
+# iteration 2
+fit<-lm(mpg ~ disp + hp + drat + wt + qsec + vs + am + gear + carb, 
+         data = mtcars)
+ind<-which.is.max(x = summary(fit)$coef[,4])
+c(rownames(summary(fit)$coef)[ind], summary(fit)$coef[ind, 4])
+```
+
+The p-value of vs is also non-significant, so it is eliminated as a potential predictor
+
+
+### Conclusion
+
+Fuel efficiency is predicted to be between 0.04107 mpg to 5.83093 mpg higher in manual transmission cars than automatic transmission cars with 95% confidence. All else being held equal, a manual transmission car improves the number of miles per gallon by 2.936, compared to a car with an automatic transmission. 
+
+### Appendix
+
+Figures  
+
+[Figure 1]: Figure 1
+```{r}
+library(ggplot2)
+options(height=60)
+ggplot(mtcars, aes(factor(am), mpg))+geom_boxplot()+labs(x="Transmission Type", y="Miles per Galon")
+```
+
+[Figure 2]: Figure 2
+```{r}
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{   usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    r <- abs(cor(x, y))
+    txt <- format(c(r, 0.123456789), digits = digits)[1]
+    txt <- paste0(prefix, txt)
+    if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+    text(0.5, 0.5, txt, cex = cex.cor * r)}
+pairs(mtcars, lower.panel = panel.smooth, upper.panel = panel.cor)
+```
+
+2. Computations
+
+Full Backwards Elimination procedure 
+```{r}
+# iteration 2
+fit<-lm(mpg ~ disp + hp + drat + wt + qsec + vs + am + gear + carb, 
+         data = mtcars)
+ind<-which.is.max(x = summary(fit)$coef[,4])
+c(rownames(summary(fit)$coef)[ind], summary(fit)$coef[ind, 4])
+
+# iteration 3
+fit<-lm(mpg ~ disp + hp + drat + wt + qsec + am + gear + carb, 
+         data = mtcars)
+ind<-which.is.max(x = summary(fit)$coef[,4])
+c(rownames(summary(fit)$coef)[ind], summary(fit)$coef[ind, 4])
+
+# iteration 4
+fit<-lm(mpg ~ disp + hp + drat + wt + qsec + am + gear, 
+         data = mtcars)
+ind<-which.is.max(x = summary(fit)$coef[,4])
+c(rownames(summary(fit)$coef)[ind], summary(fit)$coef[ind, 4])
+
+# iteration 5
+fit<-lm(mpg ~ disp + hp + drat + wt + qsec + am, 
+         data = mtcars)
+ind<-which.is.max(x = summary(fit)$coef[,4])
+c(rownames(summary(fit)$coef)[ind], summary(fit)$coef[ind, 4])
+
+# iteration 6
+fit<-lm(mpg ~ disp + hp + wt + qsec + am, 
+         data = mtcars)
+ind<-which.is.max(x = summary(fit)$coef[,4])
+c(rownames(summary(fit)$coef)[ind], summary(fit)$coef[ind, 4])
+
+# iteration 7
+fit<-lm(mpg ~ hp + wt + qsec + am, 
+         data = mtcars)
+ind<-which.is.max(x = summary(fit)$coef[,4])
+c(rownames(summary(fit)$coef)[ind], summary(fit)$coef[ind, 4])
+
+fit<-lm(mpg ~ wt + qsec + am, 
+         data = mtcars)
+ind<-which.is.max(x = summary(fit)$coef[,4])
+c(rownames(summary(fit)$coef)[ind], summary(fit)$coef[ind, 4])
+```
+This terminates the backwards elimination process. 
+```{r}
+summary(fit)$coef
+# confidence interval
+2.936+c(-1,1)*qt(p = .975, df = 27)*1.4109
+```
